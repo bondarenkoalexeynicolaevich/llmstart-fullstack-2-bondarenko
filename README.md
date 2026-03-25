@@ -1,5 +1,7 @@
 # Telegram-бот (MVP)
 
+Домашняя работа по 2 модулю "AI-driven Fullstack разработка"
+
 Чат-бот на [aiogram](https://docs.aiogram.dev/) 3.x + [OpenRouter](https://openrouter.ai/) (OpenAI-compatible API). Подробности — в [docs/vision.md](docs/vision.md).
 
 ## Требования

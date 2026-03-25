@@ -1,0 +1,45 @@
+---
+description: Project development conventions for the Telegram LLM bot
+alwaysApply: true
+---
+
+# Project Conventions
+
+Full technical vision: `docs/vision.md`
+
+## Stack
+
+Python 3.12+, aiogram 3.x (polling), openai SDK → OpenRouter, ruff, uv, python-dotenv.
+
+## Structure
+
+```
+bot/
+  main.py        # entry point
+  handlers.py    # aiogram handlers
+  llm_client.py  # OpenAI-compatible client (one class)
+  config.py      # loads .env, typed settings
+```
+
+One file — one responsibility. No mixing handlers, LLM logic, and config.
+
+## Key Principles
+
+- **KISS** — linear code, minimum abstractions.
+- No layers between Telegram → handler → LLM.
+- No patterns/abstractions until actually needed.
+- No extra services (queues, DBs, brokers) for MVP.
+- Secrets only in `.env`, never hardcoded.
+- `ruff` must pass before commit (`make lint`).
+
+## Logging
+
+- Use stdlib `logging` only.
+- Log `user_id` + event, never message content or secrets.
+- Level via `LOG_LEVEL` env var.
+
+## Don't Add
+
+- Streaming, function calling, multi-model routing.
+- Persistent storage (state lives in-memory).
+- Background workers, webhooks, microservices.
