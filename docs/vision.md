@@ -148,6 +148,18 @@ sequenceDiagram
 
 ---
 
+## Архитектурные решения
+
+Ключевые архитектурные решения фиксируются в виде ADR (Architecture Decision Record).
+
+> Полный список и детали — в [`docs/adr/`](adr/README.md).
+
+| # | Решение | Статус |
+|---|---|---|
+| [ADR-001](adr/adr-001-database.md) | Выбор СУБД — PostgreSQL | Принято |
+
+---
+
 ## Принципы разработки
 
 - **KISS** — минимум абстракций, линейный и читаемый код.
@@ -184,7 +196,10 @@ project-root/
 │   ├── idea.md
 │   ├── vision.md
 │   ├── data-model.md        # детализация доменной модели
-│   └── integrations.md     # детализация внешних интеграций
+│   ├── integrations.md      # детализация внешних интеграций
+│   └── adr/                 # архитектурные решения
+│       ├── README.md
+│       └── adr-001-database.md
 ├── .env.example
 ├── .gitignore
 ├── Makefile
