@@ -20,11 +20,11 @@
 |---|----------|--------|------------------------|
 | 1 | Стек, ADR/соглашения | ✅ | `docs/tasks/impl/backend/iteration-1-stack/plan.md`, `summary.md` |
 | 2 | Контракты API (диалог + сдача ДЗ) | ✅ | [`impl/backend/iteration-2-api-contracts/plan.md`](impl/backend/iteration-2-api-contracts/plan.md), [`summary.md`](impl/backend/iteration-2-api-contracts/summary.md) |
-| 3 | Каркас backend-сервиса | 📋 | `iteration-3-skeleton/` |
-| 4 | Базовые API-тесты (сценарии как у бота) | 📋 | `iteration-4-api-tests/` |
-| 5 | Endpoints и серверная логика | 📋 | `iteration-5-implementation/` |
-| 6 | Документация backend | 📋 | `iteration-6-docs/` |
-| 7 | Рефакторинг бота под API | 📋 | совместно с `tasklist-bot.md` |
+| 3 | Каркас backend-сервиса | ✅ | [`impl/backend/iteration-3-skeleton/plan.md`](impl/backend/iteration-3-skeleton/plan.md), [`summary.md`](impl/backend/iteration-3-skeleton/summary.md) |
+| 4 | Базовые API-тесты (сценарии как у бота) | ✅ | [`impl/backend/iteration-4-api-tests/plan.md`](impl/backend/iteration-4-api-tests/plan.md), [`summary.md`](impl/backend/iteration-4-api-tests/summary.md) |
+| 5 | Endpoints и серверная логика | ✅ | [`impl/backend/iteration-5-implementation/plan.md`](impl/backend/iteration-5-implementation/plan.md), [`summary.md`](impl/backend/iteration-5-implementation/summary.md) |
+| 6 | Документация backend | ✅ | [`impl/backend/iteration-6-docs/plan.md`](impl/backend/iteration-6-docs/plan.md), [`summary.md`](impl/backend/iteration-6-docs/summary.md) |
+| 7 | Рефакторинг бота под API | ✅ | [`impl/backend/iteration-7-bot-backend-api/plan.md`](impl/backend/iteration-7-bot-backend-api/plan.md), [`summary.md`](impl/backend/iteration-7-bot-backend-api/summary.md) |
 | 8 | Качество и инженерные практики | 📋 | `iteration-8-quality/` |
 
 *Пути `docs/tasks/impl/backend/...` — по [`docs/templates/workflow.md`](../templates/workflow.md); при первом запуске создать каталоги и `plan.md` / `summary.md` по правилам workflow.*
@@ -103,11 +103,24 @@
 
 **Цель:** Поднять минимальный повторяемый каркас: входная точка, конфиг из окружения, подключение к PostgreSQL, заготовка маршрутов, миграции для сущностей этапа 1 [`docs/plan.md`](../plan.md) (User, Flow, Participant и связи по [`docs/data-model.md`](../data-model.md)).
 
+**Ценность:** «Пустой, но живой» backend с накатываемыми миграциями базового домена — основа для API-тестов (итерация 4) и реализации контрактов v1 (итерация 5).
+
+**План итерации:** [`impl/backend/iteration-3-skeleton/plan.md`](impl/backend/iteration-3-skeleton/plan.md).
+
 ### Состав работ
 
 - Создать `backend/` (или расширить заготовку из vision): `main`/приложение, `config`, модуль API, слой доступа к БД.
 - Настроить миграции (инструмент — согласно итерации 1); начальная схема под базовый домен.
 - Расширить [`.env.example`](../../.env.example), [`README.md`](../../README.md) черновиком запуска backend.
+
+### Задачи
+
+| Задача | Папка |
+|--------|--------|
+| Каркас FastAPI | [`impl/backend/iteration-3-skeleton/tasks/task-01-scaffold-fastapi/`](impl/backend/iteration-3-skeleton/tasks/task-01-scaffold-fastapi/) |
+| Конфиг и сессия БД | [`impl/backend/iteration-3-skeleton/tasks/task-02-config-database-session/`](impl/backend/iteration-3-skeleton/tasks/task-02-config-database-session/) |
+| ORM и Alembic | [`impl/backend/iteration-3-skeleton/tasks/task-03-orm-alembic/`](impl/backend/iteration-3-skeleton/tasks/task-03-orm-alembic/) |
+| Makefile, README, зависимости | [`impl/backend/iteration-3-skeleton/tasks/task-04-tooling-docs/`](impl/backend/iteration-3-skeleton/tasks/task-04-tooling-docs/) |
 
 ### Definition of Done
 
@@ -135,11 +148,22 @@
 
 **Цель:** Автотесты, покрывающие сценарии сообщений, **эквивалентные уже существующему потоку бота** (вопрос → ответ; при необходимости заглушка LLM/OpenRouter в тестах).
 
+**План итерации:** [`impl/backend/iteration-4-api-tests/plan.md`](impl/backend/iteration-4-api-tests/plan.md).
+
 ### Состав работ
 
 - Поднять приложение в тестах (TestClient / httpx ASGI); фикстуры БД.
 - Тесты: happy-path для операции «сообщение ассистенту» и подготовка к тесту «сдача ДЗ» (после реализации endpoint'а).
 - Не логировать и не ассертить содержимое пользовательских сообщений в открытом виде там, где это дублирует vision о приватности — достаточно статусов и идентификаторов.
+
+### Задачи
+
+| Задача | Папка |
+|--------|-------|
+| Зависимости и Makefile | [`impl/backend/iteration-4-api-tests/tasks/task-01-deps-makefile/`](impl/backend/iteration-4-api-tests/tasks/task-01-deps-makefile/) |
+| conftest и фикстуры БД | [`impl/backend/iteration-4-api-tests/tasks/task-02-tests-fixtures/`](impl/backend/iteration-4-api-tests/tasks/task-02-tests-fixtures/) |
+| Диалог и LLM-порт | [`impl/backend/iteration-4-api-tests/tasks/task-03-dialog-route/`](impl/backend/iteration-4-api-tests/tasks/task-03-dialog-route/) |
+| Тесты и документация | [`impl/backend/iteration-4-api-tests/tasks/task-04-tests-and-docs/`](impl/backend/iteration-4-api-tests/tasks/task-04-tests-and-docs/) |
 
 ### Definition of Done
 
@@ -166,6 +190,8 @@
 ## Итерация 5: Основные endpoint'ы и серверная логика
 
 **Цель:** Реализовать договорённые endpoint'ы: персистентность DialogMessage, вызов OpenRouter по [`docs/integrations.md`](../integrations.md), операция создания Submission (и чтение статуса при необходимости для бота).
+
+**План итерации:** [`impl/backend/iteration-5-implementation/plan.md`](impl/backend/iteration-5-implementation/plan.md). **Итог:** [`impl/backend/iteration-5-implementation/summary.md`](impl/backend/iteration-5-implementation/summary.md).
 
 ### Состав работ
 
@@ -198,6 +224,8 @@
 ## Итерация 6: Документирование backend
 
 **Цель:** Воспроизводимый запуск, переменные окружения, OpenAPI (если есть), команды Make/README.
+
+**План итерации:** [`impl/backend/iteration-6-docs/plan.md`](impl/backend/iteration-6-docs/plan.md). **Итог:** [`impl/backend/iteration-6-docs/summary.md`](impl/backend/iteration-6-docs/summary.md).
 
 ### Состав работ
 

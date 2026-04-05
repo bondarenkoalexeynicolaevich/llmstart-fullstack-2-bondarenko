@@ -53,6 +53,8 @@ graph LR
 | Контракт | [`docs/api/backend-v1.openapi.yaml`](api/backend-v1.openapi.yaml) |
 | Критичность | **MVP** после перевода бота на HTTP (см. итерация 7 tasklist-backend) |
 
+**Discovery схемы (runtime):** при запущенном backend по базовому URL клиента доступны **`GET /openapi.json`** (схема FastAPI) и интерактивно **`GET /docs`** / **`GET /redoc`**. Детали тел запросов/ответов и кодов ошибок по-прежнему согласуют с YAML в репозитории; при расхождениях ориентир для ревью контракта — файл в `docs/api/`.
+
 Переменные окружения (пример имён — см. [`.env.example`](../.env.example)):
 
 - `BACKEND_BASE_URL` — базовый URL сервиса (например `http://127.0.0.1:8000`), без завершающего `/`.

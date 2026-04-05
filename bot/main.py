@@ -6,9 +6,9 @@ import sys
 
 from aiogram import Bot, Dispatcher
 
+from bot.backend_client import BackendClient
 from bot.config import load_settings
 from bot.handlers import setup_router
-from bot.llm_client import LLMClient
 
 
 def _configure_logging(level_name: str) -> None:
@@ -27,11 +27,14 @@ async def _run() -> None:
 
     bot = Bot(token=settings.bot_token)
     dp = Dispatcher()
-    llm = LLMClient(settings)
-    dp.include_router(setup_router(settings, llm))
+    backend = BackendClient(settings)
+    dp.include_router(setup_router(settings, backend))
 
     log.info("event=bot_start")
-    await dp.start_polling(bot)
+    try:
+        await dp.start_polling(bot)
+    finally:
+        await backend.aclose()
 
 
 def main() -> None:
