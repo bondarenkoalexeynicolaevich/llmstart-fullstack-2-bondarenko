@@ -17,6 +17,7 @@ graph LR
 
     Bot -->|"polling / webhook"| TG
     TG -->|"updates"| Bot
+    Bot -->|"REST /v1/*\nBearer"| Backend
     Backend -->|"REST (OpenAI-compatible)"| OR
     OR -->|"ответ модели"| Backend
     OR -->|"маршрутизирует к"| LLM
@@ -39,6 +40,25 @@ graph LR
 | Критичность | **MVP** — без этого бот не работает |
 
 Бот опрашивает Telegram по расписанию (polling), получает `Update`-объекты и отправляет ответы через `sendMessage`. Webhook может заменить polling при деплое без потери функциональности.
+
+---
+
+### Backend HTTP API (вызов из бота, MVP)
+
+| Атрибут | Значение |
+|---|---|
+| Назначение | Сценарии «сообщение ассистенту» и «фиксация сдачи ДЗ» через backend (ядро) |
+| Направление | Bot → Backend (HTTPS REST, префикс `/v1/`) |
+| Аутентификация | Заголовок `Authorization: Bearer <INTERNAL_API_TOKEN>` — общий секрет backend и бота, только в `.env` |
+| Контракт | [`docs/api/backend-v1.openapi.yaml`](api/backend-v1.openapi.yaml) |
+| Критичность | **MVP** после перевода бота на HTTP (см. итерация 7 tasklist-backend) |
+
+Переменные окружения (пример имён — см. [`.env.example`](../.env.example)):
+
+- `BACKEND_BASE_URL` — базовый URL сервиса (например `http://127.0.0.1:8000`), без завершающего `/`.
+- `INTERNAL_API_TOKEN` — значение Bearer; отсутствие или несовпадение с тем, что проверяет backend, даёт ответ `401` с телом ошибки по контракту.
+
+Идентификация пользователя в теле запросов: `telegram_user_id` (целое) + `flow_id` (UUID); backend резолвит `User` и `Participant` (см. [`docs/data-model.md`](data-model.md)).
 
 ---
 

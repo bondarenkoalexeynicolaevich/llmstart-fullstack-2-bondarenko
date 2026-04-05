@@ -1,0 +1,256 @@
+openapi: 3.0.3
+info:
+  title: Backend API
+  description: |
+    MVP REST v1 для сценариев «сообщение ассистенту» и «сдача ДЗ».
+    Канонический контракт; реализация — roadmap backend (итерация 5+).
+  version: 1.0.0
+
+servers:
+  - url: /
+    description: Относительно базового URL сервиса (например http://127.0.0.1:8000)
+
+tags:
+  - name: dialog-messages
+    description: Диалог студента с ассистентом
+  - name: submissions
+    description: Сдачи домашних заданий
+
+paths:
+  /v1/dialog-messages:
+    post:
+      tags: [dialog-messages]
+      summary: Отправить сообщение и получить ответ ассистента
+      description: |
+        Резолв участника по `telegram_user_id` и `flow_id`, сохранение сообщений
+        (`DialogMessage` с ролями user/assistant), ответ с текстом от LLM (логика в итерации 5).
+      operationId: createDialogMessage
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DialogMessageCreateRequest'
+      responses:
+        '200':
+          description: Сообщение обработано, ответ ассистента
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DialogMessageCreateResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/submissions:
+    post:
+      tags: [submissions]
+      summary: Зафиксировать сдачу задания
+      description: |
+        Создаёт `Submission` со статусом `submitted`. Задание должно принадлежать тому же `flow_id`.
+      operationId: createSubmission
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmissionCreateRequest'
+      responses:
+        '201':
+          description: Сдача создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmissionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Значение `INTERNAL_API_TOKEN` из окружения (см. docs/integrations.md)
+
+  schemas:
+    DialogMessageCreateRequest:
+      type: object
+      required: [flow_id, telegram_user_id, content]
+      properties:
+        flow_id:
+          type: string
+          format: uuid
+        telegram_user_id:
+          type: integer
+          format: int64
+          example: 123456789
+        content:
+          type: string
+          minLength: 1
+          description: Текст сообщения пользователя (после trim непустая строка)
+
+    DialogMessageCreateResponse:
+      type: object
+      required: [reply_text, user_message_id, assistant_message_id]
+      properties:
+        reply_text:
+          type: string
+        user_message_id:
+          type: string
+          format: uuid
+        assistant_message_id:
+          type: string
+          format: uuid
+
+    SubmissionCreateRequest:
+      type: object
+      required: [flow_id, telegram_user_id, assignment_id]
+      properties:
+        flow_id:
+          type: string
+          format: uuid
+        telegram_user_id:
+          type: integer
+          format: int64
+        assignment_id:
+          type: string
+          format: uuid
+        comment:
+          type: string
+          nullable: true
+
+    SubmissionResponse:
+      type: object
+      required: [id, assignment_id, participant_id, status, submitted_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        assignment_id:
+          type: string
+          format: uuid
+        participant_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [submitted, reviewed, approved]
+        submitted_at:
+          type: string
+          format: date-time
+          description: ISO 8601 в UTC
+        comment:
+          type: string
+          nullable: true
+
+    ErrorBody:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: Стабильный код для ветвления на клиенте
+            message:
+              type: string
+              description: Краткое описание; не использовать для логики клиента
+            details:
+              type: object
+              additionalProperties: true
+              description: Опционально, например ошибки валидации по полям
+
+  responses:
+    BadRequest:
+      description: Невалидный запрос
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorBody'
+          examples:
+            validation:
+              value:
+                error:
+                  code: validation_error
+                  message: Invalid request body
+
+    Unauthorized:
+      description: Нет или неверный Bearer-токен
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorBody'
+          examples:
+            default:
+              value:
+                error:
+                  code: unauthorized
+                  message: Authentication required
+
+    Forbidden:
+      description: Доступ запрещён (роль / политика потока)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorBody'
+          examples:
+            default:
+              value:
+                error:
+                  code: forbidden
+                  message: Operation not allowed for this participant
+
+    NotFound:
+      description: Ресурс не найден или участник не в потоке
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorBody'
+          examples:
+            flow:
+              value:
+                error:
+                  code: flow_not_found
+                  message: Flow not found
+            participant:
+              value:
+                error:
+                  code: participant_not_found
+                  message: User is not a participant of this flow
+            assignment:
+              value:
+                error:
+                  code: assignment_not_found
+                  message: Assignment not found or not in this flow
+
+    Conflict:
+      description: Конфликт бизнес-правил
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorBody'
+          examples:
+            duplicate:
+              value:
+                error:
+                  code: submission_already_exists
+                  message: Submission already exists for this assignment and participant

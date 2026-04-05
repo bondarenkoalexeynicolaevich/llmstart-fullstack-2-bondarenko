@@ -10,7 +10,7 @@
 
 ## Архитектура
 
-Целевая схема (сейчас в репо — **только бот**, без backend):
+Целевая схема (каталог **`backend/`** и запуск API появятся в [итерации 3 tasklist-backend](docs/tasks/tasklist-backend.md); стек зафиксирован в [ADR-002](docs/adr/adr-002-backend-http-orm.md)):
 
 ```mermaid
 graph LR
@@ -59,4 +59,6 @@ DoD и даты — [docs/plan.md](docs/plan.md).
 
 **Бот:** `cp .env.example .env` → заполнить `BOT_TOKEN`, `OPENROUTER_API_KEY`, `LLM_MODEL`, `SYSTEM_PROMPT` → из корня: `make install`, `make run` (`make lint` для проверки). См. также [docs/vision.md](docs/vision.md).
 
-**Backend, веб и общий запуск MVP** — по готовности итераций 1–6; воспроизводимый «полный» стенд ориентировочно к итерации 6, см. [docs/plan.md](docs/plan.md).
+**Backend (подготовка):** в `.env` позже понадобятся `DATABASE_URL` (PostgreSQL, формат `postgresql+asyncpg://…`), а также `API_HOST` / `API_PORT` для bind uvicorn — плейсхолдеры уже в [`.env.example`](.env.example). Рабочий сервер и команды Makefile описываются в [итерации 3](docs/tasks/tasklist-backend.md) tasklist-backend.
+
+**Веб и полный стенд MVP** — по готовности итераций 2–6 backend и плана продукта; ориентир — [docs/plan.md](docs/plan.md).

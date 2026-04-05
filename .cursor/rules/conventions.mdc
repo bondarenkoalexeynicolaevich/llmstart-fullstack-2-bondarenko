@@ -1,5 +1,5 @@
 ---
-description: Project development conventions for the Telegram LLM bot
+description: Project conventions for bot (client) and backend (core)
 alwaysApply: true
 ---
 
@@ -7,11 +7,22 @@ alwaysApply: true
 
 Full technical vision: `docs/vision.md`
 
-## Stack
+## Shared (repo-wide)
 
-Python 3.12+, aiogram 3.x (polling), openai SDK → OpenRouter, ruff, uv, python-dotenv.
+- **Python** 3.12+, **uv**, **ruff**, **python-dotenv**.
+- **KISS** — минимум абстракций, линейный код; паттерны и лишние слои только когда реально нужны.
+- **Секреты** только в `.env`, никогда в коде и в логах.
+- **`ruff`** должен проходить перед коммитом (см. `Makefile`; для кода в `backend/` цели появятся по мере добавления каталога, см. tasklist-backend).
 
-## Structure
+## Bot (`bot/`)
+
+Клиент Telegram: передаёт события пользователя в backend (в целевой архитектуре); на ранних итерациях может вызывать LLM напрямую, но это временный контур MVP — см. `docs/vision.md` и tasklist.
+
+### Stack
+
+aiogram 3.x (polling), OpenAI-compatible SDK → OpenRouter.
+
+### Structure
 
 ```
 bot/
@@ -23,23 +34,56 @@ bot/
 
 One file — one responsibility. No mixing handlers, LLM logic, and config.
 
-## Key Principles
+### Principles (bot)
 
-- **KISS** — linear code, minimum abstractions.
-- No layers between Telegram → handler → LLM.
-- No patterns/abstractions until actually needed.
-- No extra services (queues, DBs, brokers) for MVP.
-- Secrets only in `.env`, never hardcoded.
-- `ruff` must pass before commit (`make lint`).
+- No extra complexity between Telegram → handler → LLM **в текущем MVP-контуре бота**.
+- **Нет собственной БД в боте** и не тащить в бот бизнес-логику ядра — состояние/данные потока живут в **backend + PostgreSQL** по `docs/vision.md`.
+- Допустим **in-memory** только для локального ephemeral state бота (например кэш в рамках процесса), не как замена персистентности системы.
 
-## Logging
+### Logging (bot)
 
-- Use stdlib `logging` only.
+- stdlib `logging` only.
 - Log `user_id` + event, never message content or secrets.
 - Level via `LOG_LEVEL` env var.
 
-## Don't Add
+### Don't add (bot MVP)
 
-- Streaming, function calling, multi-model routing.
-- Persistent storage (state lives in-memory).
-- Background workers, webhooks, microservices.
+- Streaming, function calling, multi-model routing в боте без отдельного решения.
+- Фоновые воркеры, webhooks, микросервисы **внутри бота**.
+
+## Backend (`backend/`)
+
+Ядро системы: HTTP API, бизнес-логика, работа с БД и LLM. Персистентность — **PostgreSQL** ([`docs/adr/adr-001-database.md`](../../docs/adr/adr-001-database.md)); стек доступа и HTTP — [`docs/adr/adr-002-backend-http-orm.md`](../../docs/adr/adr-002-backend-http-orm.md).
+
+### Stack
+
+FastAPI, SQLAlchemy 2.x async + asyncpg, Alembic, uvicorn; конфигурация через `python-dotenv`.
+
+### Structure (KISS)
+
+Как в `docs/vision.md`:
+
+```
+backend/
+  main.py       # ASGI app / создание приложения
+  config.py     # настройки из .env
+  api/          # маршруты HTTP
+  services/     # use-cases / бизнес-логика по мере роста
+  models/       # модели данных / SQLAlchemy по мере роста
+```
+
+Границы: **api** — разбор запросов/ответов и DI; **services** — сценарии; доступ к БД — через async-сессии SQLAlchemy; не вводить DDD/лишние «порты» до реальной потребности.
+
+### Principles (backend)
+
+- Один модуль — одна зона ответственности; не смешивать с логикой бота или веб-клиента.
+- Миграции схемы только через Alembic.
+
+### Logging (backend)
+
+Как в `docs/vision.md`: stdlib `logging`, без содержимого пользовательских сообщений и секретов; `user_id`/события — да.
+
+### Don't add (until needed)
+
+- Очереди, брокеры, отдельные микросервисы для MVP без ADR.
+- Синхронный доступ к БД из async-handlers без явной изоляции (предпочтение — полностью async stack).

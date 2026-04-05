@@ -36,3 +36,4 @@ ADR (Architecture Decision Record) — короткий документ, фик
 | # | Решение | Статус | Дата |
 |---|---|---|---|
 | [ADR-001](adr-001-database.md) | Выбор СУБД — PostgreSQL | Принято | 2026-03-31 |
+| [ADR-002](adr-002-backend-http-orm.md) | HTTP-слой backend: FastAPI; ORM и миграции: SQLAlchemy 2 async, Alembic; uvicorn | Принято | 2026-04-05 |

@@ -89,12 +89,12 @@ sequenceDiagram
 
     Student->>TG: сообщение
     TG->>Bot: update
-    Bot->>API: POST /messages {user_id, text}
+    Bot->>API: POST /v1/dialog-messages (Bearer; flow_id, telegram_user_id, content)
     API->>DB: получить историю диалога
     API->>LLM: запрос (системный промпт + история + сообщение)
     LLM-->>API: ответ модели
     API->>DB: сохранить сообщение и ответ
-    API-->>Bot: {reply_text}
+    API-->>Bot: 200 JSON (reply_text, message ids)
     Bot-->>TG: sendMessage
     TG-->>Student: ответ ассистента
 ```
@@ -109,7 +109,7 @@ sequenceDiagram
     participant DB as База данных
 
     Student->>Bot: «Я выполнил задание по модулю 2»
-    Bot->>API: POST /submissions {user_id, module_id}
+    Bot->>API: POST /v1/submissions (Bearer; flow_id, telegram_user_id, assignment_id)
     API->>DB: создать submission со статусом submitted
     API-->>Bot: подтверждение
     Bot-->>Student: «Зафиксировано ✓»
@@ -157,6 +157,7 @@ sequenceDiagram
 | # | Решение | Статус |
 |---|---|---|
 | [ADR-001](adr/adr-001-database.md) | Выбор СУБД — PostgreSQL | Принято |
+| [ADR-002](adr/adr-002-backend-http-orm.md) | Backend: FastAPI, SQLAlchemy async, Alembic, uvicorn | Принято |
 
 ---
 
@@ -199,7 +200,8 @@ project-root/
 │   ├── integrations.md      # детализация внешних интеграций
 │   └── adr/                 # архитектурные решения
 │       ├── README.md
-│       └── adr-001-database.md
+│       ├── adr-001-database.md
+│       └── adr-002-backend-http-orm.md
 ├── .env.example
 ├── .gitignore
 ├── Makefile
@@ -217,6 +219,11 @@ project-root/
 | Язык | Python 3.12+ |
 | Менеджер зависимостей | uv |
 | Линтер / форматтер | ruff |
+| HTTP API | FastAPI |
+| СУБД | PostgreSQL |
+| Доступ к БД | SQLAlchemy 2.x async, asyncpg |
+| Миграции | Alembic |
+| Запуск (ASGI) | uvicorn |
 | LLM-клиент | openai (OpenAI-compatible SDK) |
 | LLM-провайдер | OpenRouter |
 | Конфигурация | python-dotenv, .env |
