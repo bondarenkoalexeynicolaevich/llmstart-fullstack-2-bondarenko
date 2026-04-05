@@ -29,7 +29,7 @@
 | 5 | Веб: преподаватель | Обзор группы, активность, управление структурой потока | 📋 Planned | [tasklist-web.md](tasks/tasklist-web.md) |
 | 6 | Эксплуатация MVP | Повторяемый запуск, согласованные секреты и `.env`, базовая наблюдаемость | 📋 Planned | [tasklist-infra.md](tasks/tasklist-infra.md) |
 
-*Строки таблицы — продуктовые этапы дорожной карты. Факт репозитория: каталог `backend/` и HTTP API v1 по [`tasklist-backend.md`](tasks/tasklist-backend.md) (итерации 1–5); бот в MVP всё ещё может вызывать LLM напрямую — этап 2 таблицы и итерация 7 backend закрывают переход на схему «бот → backend» из [`vision.md`](vision.md).*
+*Строки таблицы — продуктовые этапы дорожной карты. Факт репозитория: каталог `backend/` и HTTP API v1; по [`tasklist-backend.md`](tasks/tasklist-backend.md) закрыты backend-итерации 1–7 (включая перевод бота на схему «бот → backend», LLM и только на сервере — см. [`vision.md`](vision.md)).*
 
 ---
 

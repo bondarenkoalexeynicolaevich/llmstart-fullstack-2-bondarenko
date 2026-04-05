@@ -25,7 +25,7 @@
 | 5 | Endpoints и серверная логика | ✅ | [`impl/backend/iteration-5-implementation/plan.md`](impl/backend/iteration-5-implementation/plan.md), [`summary.md`](impl/backend/iteration-5-implementation/summary.md) |
 | 6 | Документация backend | ✅ | [`impl/backend/iteration-6-docs/plan.md`](impl/backend/iteration-6-docs/plan.md), [`summary.md`](impl/backend/iteration-6-docs/summary.md) |
 | 7 | Рефакторинг бота под API | ✅ | [`impl/backend/iteration-7-bot-backend-api/plan.md`](impl/backend/iteration-7-bot-backend-api/plan.md), [`summary.md`](impl/backend/iteration-7-bot-backend-api/summary.md) |
-| 8 | Качество и инженерные практики | 📋 | `iteration-8-quality/` |
+| 8 | Качество и инженерные практики | ✅ | [`impl/backend/iteration-8-quality/plan.md`](impl/backend/iteration-8-quality/plan.md), [`summary.md`](impl/backend/iteration-8-quality/summary.md) |
 
 *Пути `docs/tasks/impl/backend/...` — по [`docs/templates/workflow.md`](../templates/workflow.md); при первом запуске создать каталоги и `plan.md` / `summary.md` по правилам workflow.*
 
@@ -292,9 +292,11 @@
 
 **Цель:** Единые команды качества для монорепозитория, линт и тесты backend не хуже bot.
 
+**План итерации:** [`impl/backend/iteration-8-quality/plan.md`](impl/backend/iteration-8-quality/plan.md). **Итог:** [`impl/backend/iteration-8-quality/summary.md`](impl/backend/iteration-8-quality/summary.md).
+
 ### Состав работ
 
-- `Makefile`: агрегаты `lint` (bot + backend), `test` или раздельные цели + опциональный `lint-all`.
+- `Makefile`: агрегаты `lint` (bot + backend + `scripts/`), цель `test` (= `test-backend`).
 - Pre-commit или документированный чеклист перед коммитом — по желанию команды, минимум — `ruff` для `backend/`.
 - Обновить [`docs/plan.md`](../plan.md) и строку статуса в **этом** tasklist для завершённых итераций.
 
@@ -314,7 +316,7 @@
 | Кто | Что сделать |
 |-----|-------------|
 | **Агент** | Убедиться, что CI (если подключится) использует те же цели. |
-| **Пользователь** | Прочитать короткий раздел README «Quality». |
+| **Пользователь** | Прочитать раздел README «Проверки качества». |
 | **Команды** | **`make lint`**, **`make test`** / **`make test-backend`** — актуальны и задокументированы. |
 | **Результат** | Репозиторий готов к следующей фазе ([`docs/plan.md`](../plan.md) итерация 3). |
 

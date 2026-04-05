@@ -4,7 +4,7 @@
 
 ## Запуск
 
-- Из корня: **`make test-backend`** или **`pytest`** / **`pytest backend/tests`** (в [`pytest.ini`](../pytest.ini) задано `testpaths = backend/tests`).
+- Из корня: **`make test`** (алиас на тот же прогон, что **`make test-backend`**), либо **`pytest`** / **`pytest backend/tests`** (в [`pytest.ini`](../pytest.ini) задано `testpaths = backend/tests`).
 - Нужны **PostgreSQL** и URL в `.env` в корне репозитория: **`TEST_DATABASE_URL`** (предпочтительно для отдельной тестовой БД) или **`DATABASE_URL`**.
 - Если URL не задан — сессионная фикстура **`migrated_database`** делает **`pytest.skip`** с подсказкой.
 - Перед тестами фикстура вызывает **`alembic upgrade head`** (конфиг `backend/alembic.ini`), цепочка ревизий включает **`001_initial`** и **`002_dialog_submissions`**.

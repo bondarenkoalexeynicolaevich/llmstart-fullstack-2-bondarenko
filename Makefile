@@ -4,7 +4,7 @@ else
   PY := .venv/bin/python
 endif
 
-.PHONY: install run run-backend migrate-upgrade lint lint-bot lint-backend format test-backend smoke-dialog
+.PHONY: install run run-backend migrate-upgrade lint lint-bot lint-backend lint-scripts format test test-backend smoke-dialog
 
 install:
 	python -m venv .venv
@@ -19,13 +19,18 @@ run-backend:
 migrate-upgrade:
 	$(PY) -m alembic -c backend/alembic.ini upgrade head
 
-lint: lint-bot lint-backend
+lint: lint-bot lint-backend lint-scripts
 
 lint-bot:
 	$(PY) -m ruff check bot/
 
 lint-backend:
 	$(PY) -m ruff check backend/
+
+lint-scripts:
+	$(PY) -m ruff check scripts/
+
+test: test-backend
 
 test-backend:
 	$(PY) -m pytest backend/tests
@@ -34,4 +39,4 @@ smoke-dialog:
 	$(PY) scripts/smoke_dialog_api.py
 
 format:
-	$(PY) -m ruff format bot/ backend/
+	$(PY) -m ruff format bot/ backend/ scripts/

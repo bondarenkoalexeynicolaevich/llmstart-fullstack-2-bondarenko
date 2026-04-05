@@ -56,6 +56,14 @@ DoD и даты — [docs/plan.md](docs/plan.md). Реализация HTTP API 
 - [Задачи](docs/tasks/)
 - [Тесты](docs/tests.md)
 
+## Проверки качества
+
+- **`make lint`** — `ruff check` для `bot/`, `backend/`, `scripts/`.
+- **`make format`** — `ruff format` для тех же каталогов.
+- **`make test`** — то же, что **`make test-backend`**: интеграционные тесты `backend/tests/` (нужны PostgreSQL и **`TEST_DATABASE_URL`** или **`DATABASE_URL`** в `.env`; иначе см. [docs/tests.md](docs/tests.md) — пропуск или ошибка).
+
+**Перед коммитом:** `make lint` и `make test` (при доступной тестовой БД).
+
 ## Быстрый старт
 
 Общий **`make install`** из корня ставит зависимости для бота и backend.
@@ -66,7 +74,7 @@ DoD и даты — [docs/plan.md](docs/plan.md). Реализация HTTP API 
 2. Поднять **PostgreSQL** (свой инстанс или, например, `docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=app postgres:16` и строка вида `postgresql+asyncpg://postgres:dev@127.0.0.1:5432/app`). Скопировать [`.env.example`](.env.example) в `.env`. Обязательно: **`DATABASE_URL`**. Для **`/v1/*`** задайте **`INTERNAL_API_TOKEN`**. Для ответа ассистента в **`POST /v1/dialog-messages`** на backend нужен **`OPENROUTER_API_KEY`** (опционально `LLM_MODEL`, `OPENROUTER_BASE_URL`, `LLM_TEMPERATURE`, `MAX_HISTORY_MESSAGES`).
 3. **`make migrate-upgrade`** — Alembic до `head`.
 4. **`make run-backend`** — сервис на `API_HOST`:`API_PORT`; проверка `GET /health` → `{"status":"ok"}`.
-5. **`make test-backend`** — интеграционные тесты (БД; см. [docs/tests.md](docs/tests.md)).
+5. **`make test`** или **`make test-backend`** — интеграционные тесты (БД; см. [docs/tests.md](docs/tests.md)).
 
 ### Бот (HTTP → backend)
 
