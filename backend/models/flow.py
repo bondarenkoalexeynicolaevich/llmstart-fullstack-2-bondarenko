@@ -13,7 +13,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.models.base import Base
 
 if TYPE_CHECKING:
-    from backend.models.assignment import Assignment
+    from backend.models.knowledge_item import KnowledgeItem
+    from backend.models.module import Module
     from backend.models.participant import Participant
 
 
@@ -31,6 +32,12 @@ class Flow(Base):
     participants: Mapped[list[Participant]] = relationship(
         "Participant", back_populates="flow"
     )
-    assignments: Mapped[list[Assignment]] = relationship(
-        "Assignment", back_populates="flow"
+    modules: Mapped[list[Module]] = relationship(
+        "Module",
+        back_populates="flow",
+        order_by="Module.order",
+    )
+    knowledge_items: Mapped[list[KnowledgeItem]] = relationship(
+        "KnowledgeItem",
+        back_populates="flow",
     )

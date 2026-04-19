@@ -25,7 +25,7 @@ class User(Base):
     )
     telegram_id: Mapped[int | None] = mapped_column(BigInteger(), nullable=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    email: Mapped[str] = mapped_column(String(512), nullable=False, default="")
+    email: Mapped[str | None] = mapped_column(String(512), nullable=True)
     role: Mapped[MemberRole] = mapped_column(
         SAEnum(MemberRole, name="member_role", native_enum=True),
         nullable=False,

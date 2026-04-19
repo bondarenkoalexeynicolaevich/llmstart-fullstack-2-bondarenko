@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from typing import Any
 from functools import lru_cache
 from pathlib import Path
 
@@ -12,6 +13,10 @@ from dotenv import load_dotenv
 _ROOT = Path(__file__).resolve().parent.parent
 
 _DEFAULT_OPENROUTER_BASE = "https://openrouter.ai/api/v1"
+
+# Локальный Postgres (Docker) без TLS: иначе asyncpg может уйти в SSL upgrade и оборваться
+# (на части связок Windows + Python 3.14 — «unexpected connection_lost()»).
+ASYNCPG_CONNECT_ARGS: dict[str, Any] = {"ssl": False}
 
 
 def _env_int(name: str, default: int) -> int:

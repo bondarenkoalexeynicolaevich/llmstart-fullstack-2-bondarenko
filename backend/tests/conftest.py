@@ -22,6 +22,8 @@ from backend.tests.constants import TEST_TOKEN
 from backend.models.assignment import Assignment
 from backend.models.enums import MemberRole
 from backend.models.flow import Flow
+from backend.models.lesson import Lesson
+from backend.models.module import Module
 from backend.models.participant import Participant
 from backend.models.user import User
 
@@ -36,7 +38,9 @@ def _sync_database_url(async_url: str) -> str:
 
 
 def _database_url_for_tests() -> str | None:
-    return (os.getenv("TEST_DATABASE_URL") or os.getenv("DATABASE_URL") or "").strip() or None
+    return (
+        os.getenv("TEST_DATABASE_URL") or os.getenv("DATABASE_URL") or ""
+    ).strip() or None
 
 
 @pytest.fixture(scope="session")
@@ -80,8 +84,9 @@ def truncate_core_tables_sync() -> None:
         with eng.begin() as conn:
             conn.execute(
                 text(
-                    "TRUNCATE TABLE submissions, dialog_messages, assignments, "
-                    "participants, users, flows RESTART IDENTITY CASCADE",
+                    "TRUNCATE TABLE submissions, dialog_messages, materials, assignments, "
+                    "lessons, modules, knowledge_items, participants, users, flows "
+                    "RESTART IDENTITY CASCADE",
                 ),
             )
     finally:
@@ -144,15 +149,21 @@ def seed_flow_user_participant(
 
 
 def seed_assignment(*, flow_id: uuid.UUID, title: str = "Seed assignment") -> uuid.UUID:
-    """Задание в том же потоке, что и participant (для тестов сдачи)."""
+    """Задание в том же потоке, что и participant (модуль → занятие → assignment)."""
 
     settings = get_settings()
     eng = create_engine(_sync_database_url(settings.database_url), pool_pre_ping=True)
     try:
         SessionLocal = sessionmaker(bind=eng)
         with SessionLocal() as session:
+            module = Module(flow_id=flow_id, title="Seed module", order=1)
+            session.add(module)
+            session.flush()
+            lesson = Lesson(module_id=module.id, title="Seed lesson", order=1)
+            session.add(lesson)
+            session.flush()
             assignment = Assignment(
-                flow_id=flow_id,
+                lesson_id=lesson.id,
                 title=title,
                 description="Test description",
             )

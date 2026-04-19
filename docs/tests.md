@@ -7,7 +7,7 @@
 - Из корня: **`make test`** (алиас на тот же прогон, что **`make test-backend`**), либо **`pytest`** / **`pytest backend/tests`** (в [`pytest.ini`](../pytest.ini) задано `testpaths = backend/tests`).
 - Нужны **PostgreSQL** и URL в `.env` в корне репозитория: **`TEST_DATABASE_URL`** (предпочтительно для отдельной тестовой БД) или **`DATABASE_URL`**.
 - Если URL не задан — сессионная фикстура **`migrated_database`** делает **`pytest.skip`** с подсказкой.
-- Перед тестами фикстура вызывает **`alembic upgrade head`** (конфиг `backend/alembic.ini`), цепочка ревизий включает **`001_initial`** и **`002_dialog_submissions`**.
+- Перед тестами фикстура вызывает **`alembic upgrade head`** (конфиг `backend/alembic.ini`), цепочка ревизий включает **`001_initial`**, **`002_dialog_submissions`**, **`003_modules_lessons`**, **`004_knowledge_progress`** (таблица `knowledge_items` с `embedding` как `float8[]`, VIEW прогресса).
 
 ## Маркеры и окружение
 
@@ -17,8 +17,8 @@
 
 ## Фикстуры и данные
 
-- Фикстура **`client`**: перед каждым тестом вызывается **`truncate_core_tables_sync()`** — `TRUNCATE submissions, dialog_messages, assignments, participants, users, flows … CASCADE` (sync **psycopg**, см. `conftest.py`).
-- Вспомогательные сиды: **`seed_flow_user_participant`**, **`seed_assignment`**.
+- Фикстура **`client`**: перед каждым тестом вызывается **`truncate_core_tables_sync()`** — `TRUNCATE` по таблицам домена (включая `modules`, `lessons`, `materials`, `knowledge_items`) … **`CASCADE`** (sync **psycopg**, см. `conftest.py`).
+- Вспомогательные сиды: **`seed_flow_user_participant`**, **`seed_assignment`** (создаёт модуль → занятие → задание в указанном потоке).
 
 ## Структура `backend/tests/`
 
@@ -30,6 +30,7 @@
 | [`test_dialog_auth.py`](../backend/tests/test_dialog_auth.py) | Bearer для `POST /v1/dialog-messages` |
 | [`test_dialog_messages.py`](../backend/tests/test_dialog_messages.py) | Диалог: happy-path и 404 |
 | [`test_submissions_placeholder.py`](../backend/tests/test_submissions_placeholder.py) | `POST /v1/submissions` (имя файла историческое) |
+| [`test_modules_submissions.py`](../backend/tests/test_modules_submissions.py) | Read API: `GET /v1/flows/.../modules`, `GET /v1/participants/.../submissions` + цепочка со сдачей |
 
 ## Перечень тестов
 
@@ -45,8 +46,11 @@
 | 8 | `test_submissions_placeholder.py` | `test_submissions_happy_path` | `POST /v1/submissions` с сидом задания в том же flow → 201 и тело по контракту |
 | 9 | `test_submissions_placeholder.py` | `test_submissions_assignment_not_found` | Задание из другого потока → 404 `assignment_not_found` |
 | 10 | `test_submissions_placeholder.py` | `test_submissions_duplicate_conflict` | Повторная сдача того же задания тем же участником → 409 `submission_already_exists` |
+| 11 | `test_modules_submissions.py` | `test_flow_modules_and_participant_submissions_chain` | После `POST /v1/submissions` — структура модулей и список сдач участника |
+| 12 | `test_modules_submissions.py` | `test_flow_modules_not_found` | Несуществующий `flow_id` → 404 `flow_not_found` |
+| 13 | `test_modules_submissions.py` | `test_participant_submissions_not_found` | Несуществующий `participant_id` → 404 `participant_not_found` |
 
-Условие «проходит»: доступная БД, успешный `alembic upgrade head`, зависимости из [`requirements.txt`](../requirements.txt).
+Условие «проходит»: доступная БД **PostgreSQL 16+**, успешный `alembic upgrade head`, зависимости из [`requirements.txt`](../requirements.txt).
 
 ## Бот
 

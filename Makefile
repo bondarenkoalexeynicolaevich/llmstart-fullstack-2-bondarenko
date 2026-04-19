@@ -4,7 +4,7 @@ else
   PY := .venv/bin/python
 endif
 
-.PHONY: install run run-backend migrate-upgrade lint lint-bot lint-backend lint-scripts format test test-backend smoke-dialog
+.PHONY: install run run-backend migrate-upgrade db-up db-down db-reset db-shell db-logs db-status db-seed lint lint-bot lint-backend lint-scripts format test test-backend smoke-dialog
 
 install:
 	python -m venv .venv
@@ -18,6 +18,29 @@ run-backend:
 
 migrate-upgrade:
 	$(PY) -m alembic -c backend/alembic.ini upgrade head
+
+db-up:
+	docker compose up -d --wait db
+
+db-down:
+	docker compose down
+
+db-reset:
+	docker compose down -v
+	$(MAKE) db-up
+	$(MAKE) migrate-upgrade
+
+db-shell:
+	docker compose exec db psql -U app -d app
+
+db-logs:
+	docker compose logs -f db
+
+db-status:
+	$(PY) -m alembic -c backend/alembic.ini current
+
+db-seed:
+	$(PY) scripts/seed_data.py
 
 lint: lint-bot lint-backend lint-scripts
 

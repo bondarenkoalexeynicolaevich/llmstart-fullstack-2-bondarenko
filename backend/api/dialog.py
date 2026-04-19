@@ -9,7 +9,10 @@ from fastapi import APIRouter, Depends
 
 from backend.api.deps import SessionDep
 from backend.api.errors import ApiError
-from backend.api.schemas_dialog import DialogMessageCreateRequest, DialogMessageCreateResponse
+from backend.api.schemas_dialog import (
+    DialogMessageCreateRequest,
+    DialogMessageCreateResponse,
+)
 from backend.api.security import require_internal_token
 from backend.config import get_settings
 from backend.services.dialog_messages import record_dialog_exchange
@@ -38,7 +41,11 @@ async def create_dialog_message(
         body.telegram_user_id,
     )
     try:
-        reply_text, user_message_id, assistant_message_id = await record_dialog_exchange(
+        (
+            reply_text,
+            user_message_id,
+            assistant_message_id,
+        ) = await record_dialog_exchange(
             session,
             flow_id=body.flow_id,
             telegram_user_id=body.telegram_user_id,

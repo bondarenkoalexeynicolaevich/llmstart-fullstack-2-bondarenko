@@ -54,6 +54,7 @@ DoD и даты — [docs/plan.md](docs/plan.md). Реализация HTTP API 
 - [Интеграции](docs/integrations.md)
 - [План](docs/plan.md)
 - [Задачи](docs/tasks/)
+- [SQLAlchemy async и Alembic в репозитории](docs/tech/sqlalchemy-alembic-guide.md)
 - [Тесты](docs/tests.md)
 
 ## Проверки качества
@@ -71,10 +72,14 @@ DoD и даты — [docs/plan.md](docs/plan.md). Реализация HTTP API 
 ### Backend (сначала)
 
 1. **Окружение:** Python **3.12+** и [**uv**](https://docs.astral.sh/uv/getting-started/installation/) в `PATH` (в `Makefile` зависимости ставятся через `uv pip install`).
-2. Поднять **PostgreSQL** (свой инстанс или, например, `docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=app postgres:16` и строка вида `postgresql+asyncpg://postgres:dev@127.0.0.1:5432/app`). Скопировать [`.env.example`](.env.example) в `.env`. Обязательно: **`DATABASE_URL`**. Для **`/v1/*`** задайте **`INTERNAL_API_TOKEN`**. Для ответа ассистента в **`POST /v1/dialog-messages`** на backend нужен **`OPENROUTER_API_KEY`** (опционально `LLM_MODEL`, `OPENROUTER_BASE_URL`, `LLM_TEMPERATURE`, `MAX_HISTORY_MESSAGES`).
-3. **`make migrate-upgrade`** — Alembic до `head`.
+2. **PostgreSQL и `.env`:** скопировать [`.env.example`](.env.example) в `.env`. Обязательно: **`DATABASE_URL`**. Для **`/v1/*`** задайте **`INTERNAL_API_TOKEN`**. Для ответа ассистента в **`POST /v1/dialog-messages`** на backend нужен **`OPENROUTER_API_KEY`** (опционально `LLM_MODEL`, `OPENROUTER_BASE_URL`, `LLM_TEMPERATURE`, `MAX_HISTORY_MESSAGES`).
+   - **Docker Compose (репозиторий):** в `.env` согласовать `POSTGRES_*` и `DATABASE_URL` с примером. Затем с нуля: **`make db-up`** (ждёт `healthy` у сервиса `db` через `docker compose up --wait`; нужен Compose **v2.20+**) → **`make migrate-upgrade`** → опционально **`make db-seed`**. Проверка: **`python scripts/db_inspect.py`** (из корня, интерпретатор из `.venv` после `make install`) или **`make db-shell`** (в `Makefile` для `psql` заданы `-U app -d app` — должны совпадать с `POSTGRES_USER` / `POSTGRES_DB`). Сброс данных: **`make db-reset`**. Логи БД: **`make db-logs`**, версия миграций: **`make db-status`**.
+   - **Без compose:** свой инстанс или, например, `docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=app postgres:16` и строка вида `postgresql+asyncpg://postgres:dev@127.0.0.1:5432/app`. Поле `knowledge_items.embedding` в миграции `004` — `double precision[]` (без расширения pgvector); при переходе на pgvector — отдельная миграция.
+3. **`make migrate-upgrade`** — Alembic до `head` (если ещё не делали после шага 2).
 4. **`make run-backend`** — сервис на `API_HOST`:`API_PORT`; проверка `GET /health` → `{"status":"ok"}`.
 5. **`make test`** или **`make test-backend`** — интеграционные тесты (БД; см. [docs/tests.md](docs/tests.md)).
+
+Формат seed-файла и async-паттерн — [docs/tech/sqlalchemy-alembic-guide.md](docs/tech/sqlalchemy-alembic-guide.md).
 
 ### Бот (HTTP → backend)
 

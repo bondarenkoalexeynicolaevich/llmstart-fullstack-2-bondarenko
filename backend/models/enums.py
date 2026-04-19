@@ -20,3 +20,9 @@ class SubmissionStatus(str, enum.Enum):
     submitted = "submitted"
     reviewed = "reviewed"
     approved = "approved"
+
+
+class MaterialType(str, enum.Enum):
+    link = "link"
+    file = "file"
+    text = "text"

@@ -12,13 +12,19 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from backend.config import ASYNCPG_CONNECT_ARGS
+
 _engine: AsyncEngine | None = None
 _session_maker: async_sessionmaker[AsyncSession] | None = None
 
 
 def init_database(database_url: str) -> None:
     global _engine, _session_maker
-    _engine = create_async_engine(database_url, pool_pre_ping=True)
+    _engine = create_async_engine(
+        database_url,
+        pool_pre_ping=True,
+        connect_args=ASYNCPG_CONNECT_ARGS,
+    )
     _session_maker = async_sessionmaker(_engine, expire_on_commit=False)
 
 

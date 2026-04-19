@@ -31,6 +31,8 @@ submission_status = postgresql.ENUM(
     name="submission_status",
     create_type=True,
 )
+
+
 def upgrade() -> None:
     op.create_table(
         "assignments",
@@ -101,7 +103,9 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_table("submissions")
-    op.drop_index("ix_dialog_messages_participant_created", table_name="dialog_messages")
+    op.drop_index(
+        "ix_dialog_messages_participant_created", table_name="dialog_messages"
+    )
     op.drop_table("dialog_messages")
     op.drop_table("assignments")
     op.execute("DROP TYPE IF EXISTS submission_status")

@@ -1,4 +1,4 @@
-"""Модель Assignment (MVP: привязка к потоку напрямую)."""
+"""Модель Assignment (привязка к занятию)."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.models.base import Base
 
 if TYPE_CHECKING:
-    from backend.models.flow import Flow
+    from backend.models.lesson import Lesson
 
 
 class Assignment(Base):
@@ -21,10 +21,10 @@ class Assignment(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    flow_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("flows.id", ondelete="CASCADE"), nullable=False
+    lesson_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("lessons.id", ondelete="CASCADE"), nullable=False
     )
     title: Mapped[str] = mapped_column(String(512), nullable=False)
     description: Mapped[str | None] = mapped_column(Text(), nullable=True)
 
-    flow: Mapped[Flow] = relationship("Flow", back_populates="assignments")
+    lesson: Mapped[Lesson] = relationship("Lesson", back_populates="assignments")

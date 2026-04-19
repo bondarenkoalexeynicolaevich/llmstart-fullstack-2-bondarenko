@@ -11,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.assignment import Assignment
 from backend.models.enums import SubmissionStatus
+from backend.models.lesson import Lesson
+from backend.models.module import Module
 from backend.models.submission import Submission
 from backend.services.participants import resolve_flow_participant
 
@@ -35,10 +37,14 @@ async def create_submission(
         flow_id=flow_id,
         telegram_user_id=telegram_user_id,
     )
-    assignment = (
-        await session.execute(select(Assignment).where(Assignment.id == assignment_id))
-    ).scalar_one_or_none()
-    if assignment is None or assignment.flow_id != flow_id:
+    stmt = (
+        select(Assignment)
+        .join(Lesson, Assignment.lesson_id == Lesson.id)
+        .join(Module, Lesson.module_id == Module.id)
+        .where(Assignment.id == assignment_id, Module.flow_id == flow_id)
+    )
+    assignment = (await session.execute(stmt)).scalar_one_or_none()
+    if assignment is None:
         raise SubmissionCreateError(
             404,
             "assignment_not_found",
