@@ -25,7 +25,8 @@ def test_submissions_happy_path(client):
 
     assert response.status_code == 201
     payload = response.json()
-    assert uuid.UUID(payload["id"])
+    sid = uuid.UUID(payload["id"])
+    assert response.headers.get("Location") == f"/v1/submissions/{sid}"
     assert payload["assignment_id"] == str(assignment_id)
     assert payload["status"] == "submitted"
     assert payload["comment"] == "done"

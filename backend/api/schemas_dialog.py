@@ -33,3 +33,4 @@ class DialogMessageCreateResponse(BaseModel):
     reply_text: str
     user_message_id: uuid.UUID
     assistant_message_id: uuid.UUID
+    transcription: str | None = None

@@ -5,6 +5,14 @@
 
 Использование из корня:
   make db-seed
+  make db-seed-frontend-demo  # то же самое (алиас под frontend tasklist)
+
+После вставки из JSON выполняется idempotent-патч пользователя-демопреподавателя:
+telegram_id=459032551 (@Bondarenko_Alexey_Nikolaevich).
+
+Опциональный ключ `dialog_messages`: id, participant_id, role (user|assistant), content, created_at.
+
+Использование напрямую:
   .venv\\Scripts\\python.exe scripts\\seed_data.py
 """
 
@@ -20,6 +28,7 @@ from typing import Any
 from uuid import UUID
 
 from dotenv import load_dotenv
+from sqlalchemy import update
 from sqlalchemy.dialects.postgresql import insert
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -49,6 +58,8 @@ async def _seed() -> None:
     from backend.config import get_settings
     from backend.database import dispose_database, init_database, session_scope
     from backend.models.assignment import Assignment
+    from backend.models.dialog_message import DialogMessage
+    from backend.models.enums import DialogMessageRole
     from backend.models.flow import Flow
     from backend.models.knowledge_item import KnowledgeItem
     from backend.models.lesson import Lesson
@@ -71,6 +82,7 @@ async def _seed() -> None:
     assignments = payload["assignments"]
     submissions = payload["submissions"]
     knowledge_items = payload.get("knowledge_items", [])
+    dialog_messages = payload.get("dialog_messages", [])
 
     total_attempted = 0
 
@@ -99,6 +111,7 @@ async def _seed() -> None:
                     .values(
                         id=_uuid(row["id"]),
                         telegram_id=row.get("telegram_id"),
+                        telegram_username=row.get("telegram_username"),
                         name=row["name"],
                         email=row.get("email"),
                         role=row["role"],
@@ -170,6 +183,22 @@ async def _seed() -> None:
                 await session.execute(stmt)
                 total_attempted += 1
 
+            for row in dialog_messages:
+                created_dm = datetime.fromisoformat(row["created_at"])
+                stmt = (
+                    insert(DialogMessage.__table__)
+                    .values(
+                        id=_uuid(row["id"]),
+                        participant_id=_uuid(row["participant_id"]),
+                        role=DialogMessageRole(row["role"]),
+                        content=row["content"],
+                        created_at=created_dm,
+                    )
+                    .on_conflict_do_nothing(index_elements=["id"])
+                )
+                await session.execute(stmt)
+                total_attempted += 1
+
             for row in assignments:
                 stmt = (
                     insert(Assignment.__table__)
@@ -218,6 +247,18 @@ async def _seed() -> None:
                 )
                 await session.execute(stmt)
                 total_attempted += 1
+
+            # Демо-преподаватель frontend: telegram_id=459032551 (@Bondarenko_Alexey_Nikolaevich).
+            demo_teacher_id = UUID("00000000-0000-0000-0000-000000000021")
+            await session.execute(
+                update(User.__table__)
+                .where(User.__table__.c.id == demo_teacher_id)
+                .values(
+                    telegram_id=459032551,
+                    telegram_username="bondarenko_alexey_nikolaevich",
+                    name="Алексей Бондаренко",
+                ),
+            )
 
             await session.commit()
     finally:

@@ -148,6 +148,58 @@ def seed_flow_user_participant(
     return flow_id, telegram_id, participant_id
 
 
+def seed_flow_teacher_student_for_web(
+    *,
+    teacher_username: str = "TeacherWeb",
+    student_username: str = "StudentWeb",
+    teacher_telegram_id: int = 459032551,
+) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID]:
+    """Поток с двумя пользователями (telegram_username) — для JWT итерации 1."""
+
+    settings = get_settings()
+    eng = create_engine(_sync_database_url(settings.database_url), pool_pre_ping=True)
+    try:
+        SessionLocal = sessionmaker(bind=eng)
+        with SessionLocal() as session:
+            teacher = User(
+                telegram_id=teacher_telegram_id,
+                telegram_username=teacher_username.lower(),
+                name="Teacher demo",
+                role=MemberRole.teacher,
+            )
+            student = User(
+                telegram_id=teacher_telegram_id + 1,
+                telegram_username=student_username.lower(),
+                name="Student demo",
+                role=MemberRole.student,
+            )
+            flow = Flow(
+                title="Web iteration 1",
+                system_prompt="Sys",
+                started_at=date.today(),
+            )
+            session.add_all([teacher, student, flow])
+            session.flush()
+            p_teacher = Participant(
+                user_id=teacher.id,
+                flow_id=flow.id,
+                role=MemberRole.teacher,
+            )
+            p_student = Participant(
+                user_id=student.id,
+                flow_id=flow.id,
+                role=MemberRole.student,
+            )
+            session.add_all([p_teacher, p_student])
+            session.commit()
+            fid = flow.id
+            tid = p_teacher.id
+            sid = p_student.id
+    finally:
+        eng.dispose()
+    return fid, tid, sid
+
+
 def seed_assignment(*, flow_id: uuid.UUID, title: str = "Seed assignment") -> uuid.UUID:
     """Задание в том же потоке, что и participant (модуль → занятие → assignment)."""
 

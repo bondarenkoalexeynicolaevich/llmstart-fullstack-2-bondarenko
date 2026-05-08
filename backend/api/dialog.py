@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response, status
 
 from backend.api.deps import SessionDep
 from backend.api.errors import ApiError
@@ -27,9 +27,11 @@ router = APIRouter(dependencies=[Depends(require_internal_token)])
 @router.post(
     "",
     response_model=DialogMessageCreateResponse,
+    status_code=status.HTTP_201_CREATED,
     summary="Отправить сообщение и получить ответ ассистента",
 )
 async def create_dialog_message(
+    response: Response,
     body: DialogMessageCreateRequest,
     session: SessionDep,
     llm: Annotated[LlmClient, Depends(get_llm_client)],
@@ -55,13 +57,19 @@ async def create_dialog_message(
         )
     except ParticipantResolveError as exc:
         raise ApiError(exc.status_code, exc.code, exc.message) from exc
-    except RuntimeError as exc:
-        logger.error("llm_generation_failed flow_id=%s", body.flow_id)
+    except Exception as exc:
+        logger.exception(
+            "dialog_message_failed flow_id=%s telegram_user_id=%s",
+            body.flow_id,
+            body.telegram_user_id,
+        )
         raise ApiError(
             500,
             "internal_error",
             "Assistant is temporarily unavailable",
         ) from exc
+
+    response.headers["Location"] = "/v1/dialog-messages"
 
     logger.info(
         "dialog_message_completed flow_id=%s telegram_user_id=%s user_message_id=%s assistant_message_id=%s",

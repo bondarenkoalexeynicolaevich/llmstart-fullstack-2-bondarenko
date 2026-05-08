@@ -12,6 +12,7 @@ graph LR
     Bot["Telegram-бот"]
     TG["Telegram Bot API"]
     OR["OpenRouter"]
+    OAI["OpenAI\n(Whisper STT)"]
     LLM["LLM-модель"]
     Auth["OAuth-провайдер\n(Google / GitHub)"]
 
@@ -19,6 +20,7 @@ graph LR
     TG -->|"updates"| Bot
     Bot -->|"REST /v1/*\nBearer"| Backend
     Backend -->|"REST (OpenAI-compatible)"| OR
+    Backend -->|"transcriptions"| OAI
     OR -->|"ответ модели"| Backend
     OR -->|"маршрутизирует к"| LLM
     Backend -->|"OAuth 2.0"| Auth
@@ -59,8 +61,25 @@ graph LR
 
 - `BACKEND_BASE_URL` — базовый URL сервиса (например `http://127.0.0.1:8000`), без завершающего `/`.
 - `INTERNAL_API_TOKEN` — значение Bearer; отсутствие или несовпадение с тем, что проверяет backend, даёт ответ `401` с телом ошибки по контракту.
+- JWT веб-клиента: `JWT_SECRET`, при необходимости `JWT_EXPIRES_IN_SECONDS` — см. [`.env.example`](../.env.example) и `backend/config.py` (в dev возможен производный секрет от `INTERNAL_API_TOKEN`).
 
-Идентификация пользователя в теле запросов: `telegram_user_id` (целое) + `flow_id` (UUID); backend резолвит `User` и `Participant` (см. [`docs/data-model.md`](data-model.md)).
+    Идентификация пользователя в теле запросов: `telegram_user_id` (целое) + `flow_id` (UUID); backend резолвит `User` и `Participant` (см. [`docs/data-model.md`](data-model.md)). Для **голосового** диалога — `POST /v1/voice/dialog-messages` (multipart, Bearer internal или JWT веб); см. [`docs/adr/adr-004-voice-stt.md`](adr/adr-004-voice-stt.md).
+
+**Веб-клиент:** вход `POST /v1/auth/web-session` (без Bearer), далее `Authorization: Bearer <JWT>` для запросов от имени пользователя; контракт — [`docs/api/backend-v1.openapi.yaml`](api/backend-v1.openapi.yaml) и [`docs/tasks/impl/frontend/iteration-0-ui-api-contracts/tasks/task-05-api-contracts/plan.md`](tasks/impl/frontend/iteration-0-ui-api-contracts/tasks/task-05-api-contracts/plan.md).
+
+---
+
+### OpenAI Audio (Whisper STT)
+
+| Атрибут | Значение |
+|---------|----------|
+| Сервис | [OpenAI Platform](https://platform.openai.com/) — модель `whisper-1` |
+| Назначение | Преобразование голосового ввода пользователя в текст перед тем же пайплайном диалога, что для текста (`POST /v1/voice/dialog-messages`). |
+| Направление | Backend → OpenAI REST |
+| Протокол | HTTPS через официальный `openai` Python SDK (`audio/transcriptions`). |
+| Критичность | **Опция MVP** — без `OPENAI_API_KEY` голосовой режим отключён (ответ `503` с кодом `stt_unavailable`). |
+
+Клиентский LLM-поток через OpenRouter **не связан** с ключом Whisper: для STT задаётся отдельно **`OPENAI_API_KEY`** (см. [`.env.example`](../.env.example), `backend/config.py`, ADR [ADR-004](adr/adr-004-voice-stt.md)).
 
 ---
 

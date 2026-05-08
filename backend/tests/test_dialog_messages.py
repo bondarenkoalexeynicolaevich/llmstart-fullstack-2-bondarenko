@@ -41,7 +41,8 @@ def test_dialog_messages_happy_path(app, client):
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 201
+    assert response.headers.get("Location") == "/v1/dialog-messages"
     payload = response.json()
     assert payload["reply_text"] == "fake-assistant-reply"
     assert uuid.UUID(payload["user_message_id"])

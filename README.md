@@ -6,7 +6,7 @@
 
 ## О проекте
 
-Между занятиями студенты часто теряют контекст курса. Продукт даёт AI-ассистента в Telegram и (по плану) веб-клиент с единым backend. Роли: **студент**, **преподаватель**.
+Между занятиями студенты часто теряют контекст курса. Продукт даёт AI-ассистента в Telegram и веб-клиент (стек и итерации — [`docs/tasks/tasklist-frontend.md`](docs/tasks/tasklist-frontend.md)) с единым backend. Роли: **студент**, **преподаватель**.
 
 ## Архитектура
 
@@ -59,9 +59,11 @@ DoD и даты — [docs/plan.md](docs/plan.md). Реализация HTTP API 
 
 ## Проверки качества
 
+
 - **`make lint`** — `ruff check` для `bot/`, `backend/`, `scripts/`.
 - **`make format`** — `ruff format` для тех же каталогов.
 - **`make test`** — то же, что **`make test-backend`**: интеграционные тесты `backend/tests/` (нужны PostgreSQL и **`TEST_DATABASE_URL`** или **`DATABASE_URL`** в `.env`; иначе см. [docs/tests.md](docs/tests.md) — пропуск или ошибка).
+- **`make web-install`**, **`make web-dev`**, **`make web-build`**, **`make web-lint`** — фронтенд в `web/` (см. раздел «Веб-клиент» ниже).
 
 **Перед коммитом:** `make lint` и `make test` (при доступной тестовой БД).
 
@@ -72,14 +74,23 @@ DoD и даты — [docs/plan.md](docs/plan.md). Реализация HTTP API 
 ### Backend (сначала)
 
 1. **Окружение:** Python **3.12+** и [**uv**](https://docs.astral.sh/uv/getting-started/installation/) в `PATH` (в `Makefile` зависимости ставятся через `uv pip install`).
-2. **PostgreSQL и `.env`:** скопировать [`.env.example`](.env.example) в `.env`. Обязательно: **`DATABASE_URL`**. Для **`/v1/*`** задайте **`INTERNAL_API_TOKEN`**. Для ответа ассистента в **`POST /v1/dialog-messages`** на backend нужен **`OPENROUTER_API_KEY`** (опционально `LLM_MODEL`, `OPENROUTER_BASE_URL`, `LLM_TEMPERATURE`, `MAX_HISTORY_MESSAGES`).
-   - **Docker Compose (репозиторий):** в `.env` согласовать `POSTGRES_*` и `DATABASE_URL` с примером. Затем с нуля: **`make db-up`** (ждёт `healthy` у сервиса `db` через `docker compose up --wait`; нужен Compose **v2.20+**) → **`make migrate-upgrade`** → опционально **`make db-seed`**. Проверка: **`python scripts/db_inspect.py`** (из корня, интерпретатор из `.venv` после `make install`) или **`make db-shell`** (в `Makefile` для `psql` заданы `-U app -d app` — должны совпадать с `POSTGRES_USER` / `POSTGRES_DB`). Сброс данных: **`make db-reset`**. Логи БД: **`make db-logs`**, версия миграций: **`make db-status`**.
+2. **PostgreSQL и `.env`:** скопировать [`.env.example`](.env.example) в `.env`. Обязательно: **`DATABASE_URL`**. Для **`/v1/*`** задайте **`INTERNAL_API_TOKEN`** (для JWT веб-клиента см. **`JWT_SECRET`** или производный секрет в `backend/config.py`). Для ответа ассистента в **`POST /v1/dialog-messages`** на backend нужен **`OPENROUTER_API_KEY`** (опционально `LLM_MODEL`, `OPENROUTER_BASE_URL`, `LLM_TEMPERATURE`, `MAX_HISTORY_MESSAGES`).
+   - **Docker Compose (репозиторий):** в `.env` согласовать `POSTGRES_*` и `DATABASE_URL` с примером. Затем с нуля: **`make db-up`** (ждёт `healthy` у сервиса `db` через `docker compose up --wait`; нужен Compose **v2.20+**) → **`make migrate-upgrade`** → опционально **`make db-seed`** или **`make db-seed-frontend-demo`** (тот же скрипт seed, демоданные под веб см. [docs/tech/api-contracts.md](docs/tech/api-contracts.md)). Проверка: **`python scripts/db_inspect.py`** (из корня, интерпретатор из `.venv` после `make install`) или **`make db-shell`** (в `Makefile` для `psql` заданы `-U app -d app` — должны совпадать с `POSTGRES_USER` / `POSTGRES_DB`). Сброс данных: **`make db-reset`**. Логи БД: **`make db-logs`**, версия миграций: **`make db-status`**.
    - **Без compose:** свой инстанс или, например, `docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=app postgres:16` и строка вида `postgresql+asyncpg://postgres:dev@127.0.0.1:5432/app`. Поле `knowledge_items.embedding` в миграции `004` — `double precision[]` (без расширения pgvector); при переходе на pgvector — отдельная миграция.
 3. **`make migrate-upgrade`** — Alembic до `head` (если ещё не делали после шага 2).
 4. **`make run-backend`** — сервис на `API_HOST`:`API_PORT`; проверка `GET /health` → `{"status":"ok"}`.
 5. **`make test`** или **`make test-backend`** — интеграционные тесты (БД; см. [docs/tests.md](docs/tests.md)).
 
 Формат seed-файла и async-паттерн — [docs/tech/sqlalchemy-alembic-guide.md](docs/tech/sqlalchemy-alembic-guide.md).
+
+### Веб-клиент (`web/`)
+
+- **Стек:** Next.js (App Router), TypeScript, Tailwind, shadcn/ui. В [vision](docs/vision.md) для пакетов указан **pnpm**; в репозитории зависимости зафиксированы через **`web/package-lock.json`**. Команды **`make web-*`** вызывают **npm** из корня. При желании: `corepack enable`, затем `pnpm install` внутри `web/` вместо `npm install`.
+- **Окружение:** скопировать [`web/.env.example`](web/.env.example) → `web/.env.local`, при необходимости поправить `NEXT_PUBLIC_BACKEND_BASE_URL` (совпадает с URL запущенного backend).
+- **Запуск:** из корня после установки — **`make web-install`**, затем **`make web-dev`** (или `npm run dev` из `web/`). Убедитесь, что backend слушает тот же origin, что в env (по умолчанию `http://127.0.0.1:8000`). Для входа в UI нужны данные в БД и **`POST /v1/auth/web-session`** (см. [docs/tech/api-contracts.md](docs/tech/api-contracts.md)): демо-поток и username после **`make db-seed`**.
+- **Сборка / линт:** `make web-build`, `make web-lint`.
+
+План итерации каркаса — [docs/tasks/impl/frontend/iteration-2-skeleton/plan.md](docs/tasks/impl/frontend/iteration-2-skeleton/plan.md).
 
 ### Бот (HTTP → backend)
 

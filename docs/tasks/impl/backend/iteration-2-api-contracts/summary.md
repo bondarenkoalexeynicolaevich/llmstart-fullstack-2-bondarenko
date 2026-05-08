@@ -3,7 +3,7 @@
 ## Сделано
 
 - Канонический контракт: [`docs/api/backend-v1.openapi.yaml`](../../../../api/backend-v1.openapi.yaml) (см. корневой [`plan.md`](plan.md)).
-- Зафиксированы `POST /v1/dialog-messages` (`200`) и `POST /v1/submissions` (`201`), envelope ошибок, коды `401`/`403`/`404`/`409`.
+- Зафиксированы `POST /v1/dialog-messages` (`201`) и `POST /v1/submissions` (`201`), envelope ошибок, коды `401`/`403`/`404`/`409`.
 - Идентификация: `telegram_user_id` + `flow_id`; аутентификация сервиса: `Authorization: Bearer` + `INTERNAL_API_TOKEN`.
 - [`docs/integrations.md`](../../../../integrations.md) — вызов backend из бота; [`.env.example`](../../../../../.env.example) — `INTERNAL_API_TOKEN`, `BACKEND_BASE_URL`.
 - [`docs/vision.md`](../../../../vision.md) — sequenceDiagram приведены в соответствие с контрактом.

@@ -40,7 +40,7 @@
 | 2 | `test_dialog_auth.py` | `test_dialog_messages_missing_bearer_returns_401` | `POST /v1/dialog-messages` без `Authorization` → 401, код `unauthorized` |
 | 3 | `test_dialog_auth.py` | `test_dialog_messages_wrong_bearer_returns_401` | Неверный Bearer → 401, `unauthorized` |
 | 4 | `test_dialog_auth.py` | `test_dialog_messages_valid_bearer_returns_404_when_flow_missing` | Валидный Bearer, случайный `flow_id` без строки в БД → 404 `flow_not_found` |
-| 5 | `test_dialog_messages.py` | `test_dialog_messages_happy_path` | Сид User/Flow/Participant, подмена **`get_llm_client`** фейковым LLM → 200, `reply_text` и UUID сообщений; в БД **две** строки `dialog_messages` участника; `content` в запросе с пробелами — проверка trim |
+| 5 | `test_dialog_messages.py` | `test_dialog_messages_happy_path` | Сид User/Flow/Participant, подмена **`get_llm_client`** фейковым LLM → 201, `reply_text` и UUID сообщений; в БД **две** строки `dialog_messages` участника; `content` в запросе с пробелами — проверка trim |
 | 6 | `test_dialog_messages.py` | `test_dialog_messages_flow_not_found` | Несуществующий поток → 404 `flow_not_found` |
 | 7 | `test_dialog_messages.py` | `test_dialog_messages_participant_not_found` | Поток и участник есть для одного `telegram_user_id`, запрос с другим id → 404 `participant_not_found` |
 | 8 | `test_submissions_placeholder.py` | `test_submissions_happy_path` | `POST /v1/submissions` с сидом задания в том же flow → 201 и тело по контракту |

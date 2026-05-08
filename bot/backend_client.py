@@ -96,3 +96,55 @@ class BackendClient:
             status_code=response.status_code,
             error_code=error_code,
         )
+
+    async def post_voice_dialog_message(
+        self,
+        telegram_user_id: int,
+        audio_bytes: bytes,
+        filename: str,
+    ) -> str:
+        try:
+            files = {
+                "audio": (filename, audio_bytes, "application/octet-stream"),
+            }
+            data = {
+                "flow_id": str(self._settings.flow_id),
+                "telegram_user_id": str(telegram_user_id),
+            }
+            response = await self._http.post(
+                "/v1/voice/dialog-messages",
+                files=files,
+                data=data,
+            )
+        except httpx.RequestError:
+            logger.error(
+                "event=backend_voice_request_failed user_id=%s",
+                telegram_user_id,
+            )
+            raise BackendRequestError from None
+
+        if response.is_success:
+            parsed = response.json()
+            reply = parsed.get("reply_text")
+            if isinstance(reply, str):
+                return reply.strip()
+            return ""
+
+        error_code: str | None = None
+        try:
+            body = response.json()
+            if isinstance(body, dict):
+                error_code = _parse_api_error_payload(body)
+        except ValueError:
+            pass
+
+        logger.warning(
+            "event=backend_voice_http_error user_id=%s http_status=%s error_code=%s",
+            telegram_user_id,
+            response.status_code,
+            error_code or "",
+        )
+        raise BackendApiError(
+            status_code=response.status_code,
+            error_code=error_code,
+        )

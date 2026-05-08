@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 
 from backend.api.deps import SessionDep
 from backend.api.errors import ApiError
@@ -25,6 +25,7 @@ router = APIRouter(dependencies=[Depends(require_internal_token)])
     summary="Зафиксировать сдачу задания",
 )
 async def create_submission_route(
+    response: Response,
     body: SubmissionCreateRequest,
     session: SessionDep,
 ) -> SubmissionResponse:
@@ -47,6 +48,7 @@ async def create_submission_route(
         body.telegram_user_id,
         row.id,
     )
+    response.headers["Location"] = f"/v1/submissions/{row.id}"
     return SubmissionResponse(
         id=row.id,
         assignment_id=row.assignment_id,

@@ -94,7 +94,7 @@ sequenceDiagram
     API->>LLM: запрос (системный промпт + история + сообщение)
     LLM-->>API: ответ модели
     API->>DB: сохранить сообщение и ответ
-    API-->>Bot: 200 JSON (reply_text, message ids)
+    API-->>Bot: 201 JSON (reply_text, message ids)
     Bot-->>TG: sendMessage
     TG-->>Student: ответ ассистента
 ```
@@ -158,6 +158,9 @@ sequenceDiagram
 |---|---|---|
 | [ADR-001](adr/adr-001-database.md) | Выбор СУБД — PostgreSQL | Принято |
 | [ADR-002](adr/adr-002-backend-http-orm.md) | Backend: FastAPI, SQLAlchemy async, Alembic, uvicorn | Принято |
+| [ADR-003](adr/adr-003-enum-strategy.md) | Доменные перечисления в PostgreSQL: native ENUM | Принято |
+| [ADR-004](adr/adr-004-voice-stt.md) | Голосовой ввод: Whisper, `POST /v1/voice/dialog-messages` | Принято |
+| [ADR-005](adr/adr-005-text-to-sql.md) | Запросы к данным потока: LLM-классификация intent + allowlist SQL | Принято |
 
 ---
 
@@ -239,8 +242,12 @@ project-root/
 
 | Назначение | Инструмент |
 |---|---|
-| Язык / фреймворк | уточняется |
-| Интерфейсы | студент, преподаватель (единый проект, разные роли) |
+| Фреймворк | **Next.js** (App Router), **React**, **TypeScript** |
+| UI | **shadcn/ui**, **Tailwind CSS** |
+| Пакетный менеджер | **pnpm** |
+| Интерфейсы | студент, преподаватель (единый проект `web/`, разные роли) |
+
+Детальная дорожная карта UI/API: [`docs/tasks/tasklist-frontend.md`](tasks/tasklist-frontend.md). Упоминание [`docs/tasks/tasklist-web.md`](tasks/tasklist-web.md) в `docs/plan.md` — продуктовые этапы; уточнение стека и итераций — в **tasklist-frontend**.
 
 ---
 

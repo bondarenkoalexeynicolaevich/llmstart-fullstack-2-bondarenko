@@ -2,8 +2,26 @@ openapi: 3.0.3
 info:
   title: Backend API
   description: |
-    MVP REST v1 для сценариев «сообщение ассистенту» и «сдача ДЗ».
-    Канонический контракт; реализация — roadmap backend (итерация 5+).
+    REST v1: бот (диалог, сдачи), структура потока и **веб-клиент** (дашборд преподавателя,
+    лидерборд, ленты, матрица прогресса, веб-сессия и диалог по `participant_id`).
+    Канонический контракт репозитория; реализация отдельных путей — см. tasklist backend / frontend.
+
+    **Сдачи:** `POST /v1/submissions` — создание одной сдачи (бот). `GET /v1/flows/{flow_id}/submissions` —
+    лента сдач по потоку (веб/аналитика). Это разные ресурсы; путать методы и пути не следует.
+
+    **Голос:** `POST /v1/voice/dialog-messages` — multipart аудио, STT Whisper на backend (см. ADR adr-004).
+
+    **Запрос к данным потока:** `POST /v1/flows/{flow_id}/data-query` — только роль преподавателя; классификация вопроса через LLM,
+    выполнение — фиксированные SELECT (см. ADR adr-005).
+
+    **Политика 404 и 403:** для защищённых ресурсов по UUID сервер может возвращать `403`, а не `404`,
+    чтобы не раскрывать факт существования объекта — конкретное поведение фиксируется в реализации.
+
+    **Несовместимые изменения v1:** удаление полей, смена типа или смысла поля, изменение кодов ошибок
+    или формы `ErrorBody` — только с новым префиксом версии или явной миграцией клиентов.
+
+    Ответы `429` и `500`: указаны явно на чувствительных операциях; остальные методы при сбое также могут
+    вернуть `500` с телом `ErrorBody` (`code: internal_error`).
   version: 1.0.0
 
 servers:
@@ -11,14 +29,16 @@ servers:
     description: Относительно базового URL сервиса (например http://127.0.0.1:8000)
 
 tags:
+  - name: auth
+    description: Веб-вход без OAuth
   - name: dialog-messages
-    description: Диалог студента с ассистентом
+    description: Диалог с ассистентом (бот и веб)
   - name: submissions
     description: Сдачи домашних заданий
   - name: flows
-    description: Структура учебного потока
+    description: Структура учебного потока и аналитика
   - name: participants
-    description: Участники потока (read)
+    description: Участники потока
 
 paths:
   /v1/dialog-messages:
@@ -38,8 +58,15 @@ paths:
             schema:
               $ref: '#/components/schemas/DialogMessageCreateRequest'
       responses:
-        '200':
-          description: Сообщение обработано, ответ ассистента
+        '201':
+          description: Сообщения сохранены, ответ ассистента сформирован
+          headers:
+            Location:
+              description: |
+                Коллекция сообщений участника в потоке; идентификатор новой user-реплики — в теле (`user_message_id`).
+              schema:
+                type: string
+                example: /v1/dialog-messages
           content:
             application/json:
               schema:
@@ -52,6 +79,80 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/voice/dialog-messages:
+    post:
+      tags: [dialog-messages]
+      summary: Голосовое сообщение в диалог (STT + ответ ассистента)
+      description: |
+        Multipart: поле `audio` (binary), форма `flow_id` (UUID).
+        При **Bearer = INTERNAL_API_TOKEN** обязательно поле формы `telegram_user_id`
+        (как у `POST /v1/dialog-messages`): резолв участника как у бота.
+        При **Bearer = JWT веб-сессии** участник берётся из токена; `flow_id` должен совпадать с claim `flow_id`.
+        В ответе поле `transcription` — распознанный текст (дублируется как содержимое user-сообщения в БД).
+      operationId: createVoiceDialogMessage
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [audio, flow_id]
+              properties:
+                audio:
+                  type: string
+                  format: binary
+                  description: Аудио (webm, ogg/opus и др., в пределах лимита сервера)
+                flow_id:
+                  type: string
+                  format: uuid
+                telegram_user_id:
+                  type: integer
+                  format: int64
+                  description: Только для вызова с internal token (бот)
+      responses:
+        '201':
+          description: Транскрипция сохранена как user-сообщение, ответ ассистента сформирован
+          headers:
+            Location:
+              description: Коллекция диалога участника (веб URI при JWT; общий паттерн — как у текстового POST)
+              schema:
+                type: string
+                example: /v1/dialog-messages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DialogMessageCreateResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          description: Файл слишком большой
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '503':
+          description: STT недоступен (нет OPENAI_API_KEY или сбой провайдера)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /v1/submissions:
     post:
@@ -72,6 +173,12 @@ paths:
       responses:
         '201':
           description: Сдача создана
+          headers:
+            Location:
+              description: URI созданной сдачи (тот же идентификатор, что `id` в теле)
+              schema:
+                type: string
+                example: /v1/submissions/550e8400-e29b-41d4-a716-446655440000
           content:
             application/json:
               schema:
@@ -86,12 +193,16 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /v1/flows/{flow_id}/modules:
     get:
       tags: [flows]
       summary: Модули потока с занятиями
-      description: Список модулей в порядке `order` с вложенными занятиями.
+      description: |
+        Список модулей в порядке `order` с вложенными занятиями. Объём ограничен структурой курса (MVP без пагинации);
+        при существенном росте дерева — ввести `limit`/`cursor` в той же конвенции, что ленты потока.
       operationId: listFlowModules
       security:
         - bearerAuth: []
@@ -115,12 +226,16 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /v1/participants/{participant_id}/submissions:
     get:
       tags: [participants]
       summary: Сдачи участника
-      description: Все сдачи участника, новые первыми.
+      description: |
+        Все сдачи участника, новые первыми. MVP: ответ — массив без обёртки; опционально `limit` усечёт выдачу на сервере.
+        При большом числе записей планируется та же пагинация `limit`/`cursor`, что у `GET /v1/flows/{flow_id}/submissions`.
       operationId: listParticipantSubmissions
       security:
         - bearerAuth: []
@@ -131,6 +246,13 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: limit
+          in: query
+          description: Необязательный лимит записей (MVP; при отсутствии — поведение сервера по умолчанию)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
       responses:
         '200':
           description: Список сдач
@@ -144,13 +266,373 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/auth/web-session:
+    post:
+      tags: [auth]
+      summary: Веб-сессия по Telegram username
+      description: |
+        Резолвит пользователя по `telegram_username` (без @) и участие в `flow_id`,
+        возвращает JWT и идентификаторы для последующих запросов с `Authorization: Bearer`.
+        **200** (не 201): выдача токена без отдельного URL созданного «ресурса» — распространённый паттерн для логина.
+      operationId: createWebSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebSessionCreateRequest'
+      responses:
+        '200':
+          description: Сессия создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebSessionCreateResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/flows/{flow_id}/dashboard:
+    get:
+      tags: [flows]
+      summary: Дашборд преподавателя (KPI и график)
+      description: KPI с дельтой и ряд активности за 14 дней. Доступ — участник с ролью teacher.
+      operationId: getTeacherDashboard
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: flow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Дашборд
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeacherDashboardResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/flows/{flow_id}/questions:
+    get:
+      tags: [flows]
+      summary: Лента вопросов к ассистенту
+      description: Пары «вопрос пользователя — краткое резюме ответа». Пагинация курсором.
+      operationId: listFlowQuestionFeed
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: flow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            nullable: true
+      responses:
+        '200':
+          description: Страница ленты
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionFeedPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/flows/{flow_id}/submissions:
+    get:
+      tags: [flows]
+      summary: Лента сдач по потоку
+      description: Новые первыми. Для преподавателя; элементы могут включать материалы урока.
+      operationId: listFlowSubmissionFeed
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: flow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            nullable: true
+      responses:
+        '200':
+          description: Страница ленты
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmissionFeedPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/flows/{flow_id}/progress-matrix:
+    get:
+      tags: [flows]
+      summary: Матрица прогресса студентов по урокам
+      operationId: getFlowProgressMatrix
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: flow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Уроки и строки участников
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgressMatrixResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/flows/{flow_id}/leaderboard:
+    get:
+      tags: [flows]
+      summary: Лидерборд (таблица и scatter)
+      operationId: getFlowLeaderboard
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: flow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Таблица и точки для графика
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaderboardResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/flows/{flow_id}/data-query:
+    post:
+      tags: [flows]
+      summary: Вопрос к данным потока (преподаватель)
+      description: |
+        Принимает свободный текст вопроса. LLM возвращает только JSON с `intent` и `params` из whitelist;
+        backend выполняет соответствующий параметризованный запрос к БД.
+        Ответ включает `correlation_id` для трассировки (текст вопроса в логи не записывается).
+        При несовместимости с поддержанными сценариями — `400` с кодом `unrecognized_intent`.
+      operationId: postFlowDataQuery
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: flow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DataQueryRequest'
+      responses:
+        '200':
+          description: Агрегаты и пояснение
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataQueryResponse'
+        '400':
+          description: Бизнес / классификация (неизвестный intent)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/participants/{participant_id}/dialog-messages:
+    get:
+      tags: [dialog-messages]
+      summary: История диалога участника (веб)
+      operationId: listParticipantDialogMessages
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: participant_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: flow_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            nullable: true
+      responses:
+        '200':
+          description: Страница сообщений
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DialogMessageListPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags: [dialog-messages]
+      summary: Отправить сообщение в диалог (веб)
+      description: Создаёт сообщение пользователя и ответ ассистента; проверка прав по `flow_id` и `participant_id`.
+      operationId: createParticipantDialogMessage
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: participant_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: flow_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParticipantDialogMessageCreateRequest'
+      responses:
+        '201':
+          description: Сообщения сохранены, ответ ассистента сформирован
+          headers:
+            Location:
+              description: Коллекция диалога участника; новые id — в теле ответа.
+              schema:
+                type: string
+                example: /v1/participants/550e8400-e29b-41d4-a716-446655440000/dialog-messages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DialogMessageCreateResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
-      description: Значение `INTERNAL_API_TOKEN` из окружения (см. docs/integrations.md)
+      description: |
+        `INTERNAL_API_TOKEN` (бот из `.env`) или JWT веб-сессии из `POST /v1/auth/web-session`.
+        См. docs/integrations.md и docs/tasks/impl/frontend/iteration-0-ui-api-contracts/plan.md.
 
   schemas:
     DialogMessageCreateRequest:
@@ -181,6 +663,415 @@ components:
         assistant_message_id:
           type: string
           format: uuid
+        transcription:
+          type: string
+          nullable: true
+          description: При голосовом заполнено распознанным текстом пользователя (опционально)
+
+    WebSessionCreateRequest:
+      type: object
+      required: [telegram_username, flow_id]
+      properties:
+        telegram_username:
+          type: string
+          minLength: 1
+          description: Username в Telegram без префикса @; сравнение без учёта регистра на сервере
+        flow_id:
+          type: string
+          format: uuid
+
+    WebSessionCreateResponse:
+      type: object
+      required: [access_token, token_type, expires_in, user_id, participant_id, role, display_name]
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          example: Bearer
+        expires_in:
+          type: integer
+          description: Секунды до истечения токена
+        user_id:
+          type: string
+          format: uuid
+        participant_id:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [student, teacher]
+        display_name:
+          type: string
+
+    TeacherDashboardResponse:
+      type: object
+      required: [period, kpis, activity]
+      properties:
+        period:
+          type: object
+          required: [start_date, end_date, label]
+          properties:
+            start_date:
+              type: string
+              format: date
+            end_date:
+              type: string
+              format: date
+            label:
+              type: string
+        kpis:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardKpi'
+        activity:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActivityDay'
+
+    DashboardKpi:
+      type: object
+      required: [id, value, delta, delta_direction, unit]
+      properties:
+        id:
+          type: string
+          enum: [active_students, submissions_count, questions_count, completion_rate]
+        value:
+          type: number
+        delta:
+          type: number
+        delta_direction:
+          type: string
+          enum: [up, down, unchanged]
+        unit:
+          type: string
+          enum: [count, percent]
+
+    ActivityDay:
+      type: object
+      required: [date, count]
+      properties:
+        date:
+          type: string
+          format: date
+        count:
+          type: integer
+          minimum: 0
+
+    CursorPageMeta:
+      type: object
+      required: [next_cursor]
+      properties:
+        next_cursor:
+          type: string
+          nullable: true
+          description: Пусто если страница последняя
+
+    QuestionFeedPage:
+      allOf:
+        - $ref: '#/components/schemas/CursorPageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/QuestionFeedItem'
+
+    QuestionFeedItem:
+      type: object
+      required: [participant_id, participant_name, asked_at, question_text]
+      properties:
+        participant_id:
+          type: string
+          format: uuid
+        participant_name:
+          type: string
+        asked_at:
+          type: string
+          format: date-time
+        question_text:
+          type: string
+        answer_summary:
+          type: string
+          nullable: true
+
+    SubmissionFeedPage:
+      allOf:
+        - $ref: '#/components/schemas/CursorPageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/SubmissionFeedItem'
+
+    MaterialRef:
+      type: object
+      required: [id, title, type]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        type:
+          type: string
+          enum: [link, file, text]
+        url:
+          type: string
+          nullable: true
+        content:
+          type: string
+          nullable: true
+
+    SubmissionFeedItem:
+      type: object
+      required:
+        - submission_id
+        - participant_id
+        - participant_name
+        - lesson_id
+        - lesson_title
+        - assignment_id
+        - assignment_title
+        - status
+        - submitted_at
+        - materials
+      properties:
+        submission_id:
+          type: string
+          format: uuid
+        participant_id:
+          type: string
+          format: uuid
+        participant_name:
+          type: string
+        lesson_id:
+          type: string
+          format: uuid
+        lesson_title:
+          type: string
+        assignment_id:
+          type: string
+          format: uuid
+        assignment_title:
+          type: string
+        status:
+          type: string
+          enum: [submitted, reviewed, approved]
+        submitted_at:
+          type: string
+          format: date-time
+        comment:
+          type: string
+          nullable: true
+        materials:
+          type: array
+          items:
+            $ref: '#/components/schemas/MaterialRef'
+
+    ProgressMatrixResponse:
+      type: object
+      required: [lessons, rows]
+      properties:
+        lessons:
+          type: array
+          items:
+            $ref: '#/components/schemas/MatrixLessonColumn'
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/MatrixParticipantRow'
+
+    MatrixLessonColumn:
+      type: object
+      required: [id, title, module_title, module_order, lesson_order]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        module_title:
+          type: string
+        module_order:
+          type: integer
+        lesson_order:
+          type: integer
+
+    MatrixCell:
+      type: object
+      description: Пустая ячейка — оба поля null
+      properties:
+        status:
+          type: string
+          nullable: true
+          enum: [submitted, reviewed, approved]
+        submitted_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    MatrixParticipantRow:
+      type: object
+      required: [participant_id, display_name, cells]
+      properties:
+        participant_id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+        cells:
+          type: array
+          items:
+            $ref: '#/components/schemas/MatrixCell'
+
+    DataQueryRequest:
+      type: object
+      required: [question]
+      additionalProperties: false
+      properties:
+        question:
+          type: string
+          minLength: 1
+          maxLength: 2000
+
+    DataQueryRow:
+      type: object
+      additionalProperties: true
+      description: Строка результата; набор столбцов зависит от intent
+
+    DataQueryResponse:
+      type: object
+      required: [intent, params, result, explanation, correlation_id]
+      additionalProperties: false
+      properties:
+        intent:
+          type: string
+          description: Идентификатор выполненного сценария (whitelist)
+        params:
+          type: object
+          additionalProperties: true
+        result:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/DataQueryRow'
+        explanation:
+          type: string
+        correlation_id:
+          type: string
+          format: uuid
+
+    LeaderboardResponse:
+      type: object
+      required: [scatter_meta, table, scatter]
+      properties:
+        scatter_meta:
+          type: object
+          required: [axis_x_label, axis_y_label]
+          properties:
+            axis_x_label:
+              type: string
+            axis_y_label:
+              type: string
+        table:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeaderboardRow'
+        scatter:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScatterPoint'
+
+    LeaderboardRow:
+      type: object
+      required: [rank, participant_id, display_name, overall_progress, lesson_statuses, medal]
+      properties:
+        rank:
+          type: integer
+          minimum: 1
+        participant_id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+        overall_progress:
+          type: number
+          minimum: 0
+          maximum: 100
+        lesson_statuses:
+          type: array
+          items:
+            $ref: '#/components/schemas/LessonStatusIcon'
+        medal:
+          type: string
+          nullable: true
+          enum: [gold, silver, bronze]
+
+    LessonStatusIcon:
+      type: object
+      required: [lesson_id, state]
+      properties:
+        lesson_id:
+          type: string
+          format: uuid
+        state:
+          type: string
+          enum: [done, partial, none]
+
+    ScatterPoint:
+      type: object
+      required: [participant_id, display_name, x, y, rank]
+      properties:
+        participant_id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+        x:
+          type: number
+        y:
+          type: number
+        rank:
+          type: integer
+
+    DialogMessageRead:
+      type: object
+      required: [id, role, content, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [user, assistant, system]
+        content:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    DialogMessageListPage:
+      allOf:
+        - $ref: '#/components/schemas/CursorPageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/DialogMessageRead'
+
+    ParticipantDialogMessageCreateRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
 
     SubmissionCreateRequest:
       type: object
@@ -292,9 +1183,19 @@ components:
               type: string
               description: Краткое описание; не использовать для логики клиента
             details:
-              type: object
-              additionalProperties: true
-              description: Опционально, например ошибки валидации по полям
+              type: array
+              nullable: true
+              description: Опционально; ошибки валидации по полям (клиент ветвит по `code`, не по `message`)
+              items:
+                type: object
+                required: [field, issue]
+                properties:
+                  field:
+                    type: string
+                    description: Имя поля или path (например body.telegram_username)
+                  issue:
+                    type: string
+                    description: Краткое описание проблемы для разработчика
 
   responses:
     BadRequest:
@@ -309,6 +1210,9 @@ components:
                 error:
                   code: validation_error
                   message: Invalid request body
+                  details:
+                    - field: telegram_username
+                      issue: must not be empty
 
     Unauthorized:
       description: Нет или неверный Bearer-токен
@@ -337,7 +1241,9 @@ components:
                   message: Operation not allowed for this participant
 
     NotFound:
-      description: Ресурс не найден или участник не в потоке
+      description: |
+        Ресурс не найден или связь участник–поток отсутствует (см. стабильный `error.code` в теле).
+        При доступе к чужим данным по UUID реализация может вернуть `403` вместо `404` — см. описание API в `info`.
       content:
         application/json:
           schema:
@@ -358,6 +1264,16 @@ components:
                 error:
                   code: assignment_not_found
                   message: Assignment not found or not in this flow
+            user_not_found:
+              value:
+                error:
+                  code: user_not_found
+                  message: No user matches this telegram username
+            user_not_in_flow:
+              value:
+                error:
+                  code: user_not_in_flow
+                  message: User is not a participant of the given flow
 
     Conflict:
       description: Конфликт бизнес-правил
@@ -371,3 +1287,42 @@ components:
                 error:
                   code: submission_already_exists
                   message: Submission already exists for this assignment and participant
+
+    TooManyRequests:
+      description: Превышен лимит запросов (например к LLM); при наличии — заголовок Retry-After
+      headers:
+        Retry-After:
+          description: Рекомендуемая пауза перед повтором, секунды
+          schema:
+            type: integer
+            minimum: 0
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorBody'
+          examples:
+            default:
+              value:
+                error:
+                  code: rate_limited
+                  message: Too many requests
+
+    ValidationError:
+      description: Ошибки валидации тела запроса (FastAPI/Pydantic)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorBody'
+
+    InternalServerError:
+      description: Внутренняя ошибка; тело без stack trace и внутренних путей
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorBody'
+          examples:
+            default:
+              value:
+                error:
+                  code: internal_error
+                  message: An unexpected error occurred
